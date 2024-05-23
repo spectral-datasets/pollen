@@ -1,8 +1,8 @@
 # Project: adams
-# Date: 2021-05-31 13:46:23
-# User: dale
-# Charset: windows-1252
-# Modules: adams-compress,adams-core,adams-db,adams-event,adams-excel,adams-heatmap,adams-imaging,adams-imaging-boofcv,adams-json,adams-math,adams-matlab,adams-meta,adams-ml,adams-net,adams-odf,adams-pdf,adams-r,adams-rabbitmq,adams-rabbitmq-rats,adams-rats-core,adams-rats-net,adams-rats-rest,adams-rats-webservice,adams-rest,adams-security,adams-spectral-2dim-core,adams-spectral-2dim-handheld,adams-spectral-2dim-rats,adams-spectral-2dim-webservice,adams-spectral-3way-core,adams-spectral-app,adams-spreadsheet,adams-terminal,adams-visualstats,adams-webservice,adams-webservice-core,adams-weka-lts,adams-xml,adams-yaml
+# Date: 2024-05-24 09:59:05
+# User: fracpete
+# Charset: UTF-8
+# Modules: adams-bootstrapp,adams-compress,adams-core,adams-db,adams-event,adams-excel,adams-heatmap,adams-imaging,adams-imaging-boofcv,adams-json,adams-math,adams-matlab,adams-meta,adams-ml,adams-net,adams-odf,adams-pdf,adams-pyro4,adams-python,adams-r,adams-rats-core,adams-rats-net,adams-rats-redis,adams-rats-rest,adams-rats-webservice,adams-redis,adams-rest,adams-security,adams-spectral-2dim-core,adams-spectral-2dim-handheld,adams-spectral-2dim-r,adams-spectral-2dim-rats,adams-spectral-2dim-webservice,adams-spectral-3way-core,adams-spectral-app,adams-spreadsheet,adams-terminal,adams-visualstats,adams-webservice,adams-webservice-core,adams-weka-lts,adams-xml,adams-yaml
 #
 adams.flow.control.Flow -flow-execution-listener adams.flow.execution.NullListener -flow-restart-manager adams.flow.control.flowrestart.NullManager
  adams.flow.standalone.SetVariable -name "SetVariable (8)" -var-name rows_with_amplitudes -var-value 2-last
@@ -10,11 +10,59 @@ adams.flow.control.Flow -flow-execution-listener adams.flow.execution.NullListen
  adams.flow.standalone.SetVariable -name "SetVariable (3)" -var-name header_row -var-value 1
  adams.flow.standalone.SetVariable -name "SetVariable (5)" -var-name column_with_id -var-value 1
  adams.flow.standalone.SetVariable -name "SetVariable (2)" -var-name columns_with_sampledata -var-value ""
- adams.flow.source.Variable -var-name flow_dir -conversion adams.data.conversion.StringToString
- adams.flow.transformer.AppendName -suffix "raw/Spectral data.xlsx" -use-forward-slashes true
+ adams.flow.standalone.SetVariable -name "restore file" -var-name restore -var-value @{flow_file_long}.props -expand-value true
+ adams.flow.standalone.SetVariable -name output_dir -var-name output_dir -var-value @{flow_dir}/output -expand-value true
+ adams.flow.standalone.SetVariable -name output_file -var-name output_file -var-value @{output_dir}/all.csv -expand-value true
+ adams.flow.standalone.MakeDir -dir @{output_dir}
+ adams.flow.source.SelectFile -stop-if-canceled true -file-chooser-title "Select spreadsheet" -extension xlsx -absolute true -use-forward-slashes true -restoration-enabled true -restoration-file @{restore}
+ adams.flow.control.Trigger -name "init species"
+  adams.flow.source.CombineVariables -expression "PA,Poa alpina\\nAO,Anthoxanthum odoratum\\nFO,Festuca ovina" -conversion "adams.data.conversion.StringToSpreadSheet -reader \"adams.data.io.input.CsvSpreadSheetReader -data-row-type adams.data.spreadsheet.DenseDataRow -spreadsheet-type adams.data.spreadsheet.DefaultSpreadSheet -no-header true -parse-formulas false\""
+  adams.flow.transformer.LookUpInit -storage-name species
+ adams.flow.control.Trigger -name "init population"
+  adams.flow.source.CombineVariables -expression "PAp1,Sweden \\nPAp2,Italy\\nPAp3,Norway\\nAOp1,France\\nAOp2,Greece\\nAOp3,Finland\\nFOp1,Sweden \\nFOp2,Finland\\nFOp3,Italy" -conversion "adams.data.conversion.StringToSpreadSheet -reader \"adams.data.io.input.CsvSpreadSheetReader -data-row-type adams.data.spreadsheet.DenseDataRow -spreadsheet-type adams.data.spreadsheet.DefaultSpreadSheet -no-header true -parse-formulas false\""
+  adams.flow.transformer.LookUpInit -storage-name population
+ adams.flow.control.Trigger -name "init growth conditions"
+  adams.flow.source.CombineVariables -expression "c1,14°C +NU\\nc2,14°C -NU\\nc3,20°C +NU\\nc4,20°C -NU" -conversion "adams.data.conversion.StringToSpreadSheet -reader \"adams.data.io.input.CsvSpreadSheetReader -data-row-type adams.data.spreadsheet.DenseDataRow -spreadsheet-type adams.data.spreadsheet.DefaultSpreadSheet -no-header true -parse-formulas false\""
+  adams.flow.transformer.LookUpInit -storage-name growth_conditions
  adams.flow.control.Tee -name "Read spectra and reference"
   adams.flow.transformer.SpreadSheetFileReader -reader "adams.data.io.input.ExcelStreamingSpreadSheetReader -data-row-type adams.data.spreadsheet.DenseDataRow -spreadsheet-type adams.data.spreadsheet.DefaultSpreadSheet -sheets 1 -text-columns 1 -no-header true"
   adams.flow.transformer.Convert -conversion "adams.data.conversion.SpreadSheetRowsToSpectra -row-wave-number @{header_row} -cols-amplitude @{columns_with_amplitudes} -rows-amplitude @{rows_with_amplitudes} -row-sampledata-names @{header_row} -cols-sampledata @{columns_with_sampledata} -col-id @{column_with_id}"
   adams.flow.transformer.ArrayToSequence
-  adams.flow.transformer.SetStorageValue -storage-name spectrum
-  adams.flow.sink.SpectrumDisplay -display-type adams.flow.core.displaytype.Default -writer adams.gui.print.NullWriter -color-provider adams.gui.visualization.core.DefaultColorProvider -paintlet adams.gui.visualization.spectrum.SpectrumPaintlet -plot-updater adams.flow.sink.spectrumdisplay.SimplePlotUpdater
+  adams.flow.control.Tee -name "extract metadata from sample id"
+   adams.flow.transformer.GetID
+   adams.flow.control.Tee -name species
+    adams.flow.transformer.StringReplace -find ^(..).*$ -replace $1
+    adams.flow.transformer.LookUp -storage-name species -missing-key OUTPUT_KEY -suppress-missing-key-warnings true
+    adams.flow.transformer.SetVariable -var-name species
+   adams.flow.control.Tee -name population
+    adams.flow.transformer.StringReplace -find ^(....).*$ -replace $1
+    adams.flow.transformer.LookUp -storage-name population -missing-key OUTPUT_KEY -suppress-missing-key-warnings true
+    adams.flow.transformer.SetVariable -var-name population
+   adams.flow.control.Tee -name "growth conditions"
+    adams.flow.transformer.StringReplace -find ^....(..).*$ -replace $1
+    adams.flow.transformer.LookUp -storage-name growth_conditions -missing-key OUTPUT_KEY -suppress-missing-key-warnings true
+    adams.flow.transformer.SetVariable -var-name growth_conditions
+   adams.flow.control.Tee -name individual
+    adams.flow.transformer.StringReplace -find ^......(...).*$ -replace $1
+    adams.flow.transformer.LookUp -storage-name growth_conditions -missing-key OUTPUT_KEY -suppress-missing-key-warnings true
+    adams.flow.transformer.SetVariable -var-name individual
+   adams.flow.control.Tee -name batch
+    adams.flow.transformer.StringReplace -find ^.........(.).*$ -replace $1
+    adams.flow.transformer.LookUp -storage-name growth_conditions -missing-key OUTPUT_KEY -suppress-missing-key-warnings true
+    adams.flow.transformer.SetVariable -var-name batch
+   adams.flow.control.Tee -name replicate
+    adams.flow.transformer.StringReplace -find ^.*(..)$ -replace $1
+    adams.flow.transformer.LookUp -storage-name growth_conditions -missing-key OUTPUT_KEY -suppress-missing-key-warnings true
+    adams.flow.transformer.SetVariable -var-name replicate
+  adams.flow.transformer.SetReportValue -name species -field Species[S] -value @{species}
+  adams.flow.transformer.SetReportValue -name population -field Population[S] -value @{population}
+  adams.flow.transformer.SetReportValue -name "growth conditions" -field "Growth conditions[S]" -value @{growth_conditions}
+  adams.flow.transformer.SetReportValue -name individual -field Individual[S] -value @{individual}
+  adams.flow.transformer.SetReportValue -name batch -field Batch[S] -value @{batch}
+  adams.flow.transformer.SetReportValue -name replicate -field Replicate[S] -value @{replicate}
+  adams.flow.transformer.InstanceGenerator -generator "adams.data.instances.SimpleInstanceGenerator -additional Population[S] -additional \"Growth conditions[S]\" -additional Individual[S] -additional Batch[S] -additional Replicate[S] -no-additional-prefix true -field Species[S] -class-label \"Poa alpina\" -class-label \"Anthoxanthum odoratum\" -class-label \"Festuca ovina\" -wave-number-as-suffix true"
+  adams.flow.transformer.WekaInstanceBuffer
+  adams.flow.transformer.SetStorageValue -storage-name data
+ adams.flow.control.Trigger -name "Save CSV"
+  adams.flow.source.StorageValue -storage-name data -conversion adams.data.conversion.UnknownToUnknown
+  adams.flow.sink.WekaFileWriter -output @{output_file} -use-custom true -saver "weka.core.converters.SpreadSheetSaver -writer \"adams.data.io.output.CsvSpreadSheetWriter -always-quote-text true\""
