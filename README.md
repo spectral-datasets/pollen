@@ -6,7 +6,7 @@ High-throughput FTIR spectroscopy approach to assess adaptive variation in the c
 
 * [2021.5.31](https://github.com/spectral-datasets/pollen/releases/tag/v2021.5.31)
 
-  * [csv.zip](https://github.com/spectral-datasets/pollen/releases/download/v2021.5.31/csv.zip)
+  * [all.zip](https://github.com/spectral-datasets/pollen/releases/download/v2021.5.31/all.zip)
  
 * [raw](https://github.com/spectral-datasets/pollen/releases/tag/raw)
 
