@@ -27,4 +27,4 @@ Zimmermann, Boris et al. (2018). Data from: A high-throughput FTIR spectroscopy 
 ## License
 
 * Dataset: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
-* ADAMS flows: [MIT](https://opensource.org/licenses/MIT)
+* ADAMS flow: [MIT](https://opensource.org/licenses/MIT)
